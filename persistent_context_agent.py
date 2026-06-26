@@ -16,6 +16,8 @@ def get_current_time() -> str:
     """returns the current local time"""
     return datetime.now().strftime("%Y-%m-$d %H:%M:%S")
 
+conversation_memory = ConversationMemory(max_messages=50)
+
 assistant = Agent(
     name="personal_assistant",
     model="google_gemini/gemini-2.5-flash",
@@ -24,6 +26,7 @@ assistant = Agent(
         "and remember useful user details across turns"
     ),
     tools=[get_current_time]
+    memory=conversation_memory,
 )
 
 if __name__ == "__main__":
