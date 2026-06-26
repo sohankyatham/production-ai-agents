@@ -53,6 +53,11 @@ def lookup_order(order_id: str) -> dict:
     """lookup order in database by ID"""
     return MOCK_DB["orders"].get(order_id, {"error": "order not found"})
 
+@tool(approval_required=True) # Need to manually approve in order for tool to execute
+def process_refund(order_id: str, amount: float) -> str:
+    """request a refund, pause for human approval think before you run this"""
+    return f"Refunded {amount:.2f} for order {order_id}"
+
 support_agent = Agent(
     name="support_agent",
     model="google_gemini/gemini-2.5-flash",
@@ -67,7 +72,7 @@ support_agent = Agent(
         "customer for it. Always populate the message field with a clear reply."
     ),
     output_type=SupportResponse,
-    tools=[search_knowledge_base, lookup_order],
+    tools=[search_knowledge_base, lookup_order, process_refund],
     memory=ConversationMemory(max_messages=50),
     max_turns=10,
 )
@@ -79,7 +84,17 @@ def run_interactive(prompt: str) -> None:
 
         order_id, amount = None, None
         for event in stream:
-            pass
+            if event.type == EventType.TOOL_CALL and event.args:
+                order_id = event.args.get("order_id") or order_id
+            elif event.type == EventType.TOOL_RESULT and isinstance(event.result, dict):
+                amount = event.result.get("total") or amount
+            elif event.type == EventType.WAITING:
+                print(f"\nApproval required: refund ${amount:.2f} for order {order_id}")
+                decision = input("Approve? (y/n): ").lower().strip()
+                if decision == "y":
+                    handle.approve()
+                else:
+                    handle.reject("user rejected")
 
         result = stream.get_result()
         output = result
