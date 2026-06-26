@@ -58,6 +58,13 @@ def process_refund(order_id: str, amount: float) -> str:
     """request a refund, pause for human approval think before you run this"""
     return f"Refunded {amount:.2f} for order {order_id}"
 
+@guardrail
+def safe_support_request(prompt: str) -> GuardrailResult:
+    """Block obvious prompt injection attempts"""
+    blocked = ["ignore", "ignore previous", "system prompt", "jailbreak"]
+    passed = not any(phrase in prompt.lower() for phrase in blocked)
+    return GuardrailResult(passed=passed, message="Please ask a normal question, this is blocked.")
+
 support_agent = Agent(
     name="support_agent",
     model="google_gemini/gemini-2.5-flash",
@@ -74,15 +81,22 @@ support_agent = Agent(
     output_type=SupportResponse,
     tools=[search_knowledge_base, lookup_order, process_refund],
     memory=ConversationMemory(max_messages=50),
+    guardrails=[Guardrail(safe_support_request, position=Position.INPUT, on_fail=OnFail.RAISE)],
     max_turns=10,
 )
 
 def run_interactive(prompt: str) -> None:
     with AgentRuntime() as runtime:
-        handle = start(support_agent, prompt, runtime=runtime)
+        try:
+            handle = start(support_agent, prompt, runtime=runtime)
+        except ValueError as e:
+            # If a guardrail blocks it, catch the error and print a clean response
+            print(f"\nAssistant: [Blocked] {e}\n")
+            return
+        
         stream = handle.stream()
-
         order_id, amount = None, None
+        
         for event in stream:
             if event.type == EventType.TOOL_CALL and event.args:
                 order_id = event.args.get("order_id") or order_id
