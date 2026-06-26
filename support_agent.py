@@ -97,9 +97,18 @@ def run_interactive(prompt: str) -> None:
                     handle.reject("user rejected")
 
         result = stream.get_result()
-        output = result
 
-        print(f"\n{output}\n")
+        # Safely extract Pydantic data from the Agentspan wrapper
+        if hasattr(result, 'output') and 'result' in result.output:
+            support_data = result.output['result'] # This is a dictionary or object matching SupportResponse
+            
+            # If it's a dictionary, get the message string
+            if isinstance(support_data, dict):
+                print(f"\nAssistant: {support_data.get('message')}\n")
+            else:
+                print(f"\nAssistant: {support_data.message}\n")
+        else:
+            print(f"\nAssistant: {result}\n")
 
 
 if __name__ == "__main__":
