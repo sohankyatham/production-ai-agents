@@ -25,7 +25,7 @@ assistant = Agent(
         "You are a concise personal assistant. Use tools when they help"
         "and remember useful user details across turns"
     ),
-    tools=[get_current_time]
+    tools=[get_current_time],
     memory=conversation_memory,
 )
 
@@ -41,4 +41,8 @@ if __name__ == "__main__":
                 continue
 
             result = run(assistant, prompt, runtime=runtime)
-            print(f"Assistant: {result.output.get('result')}")
+            readable_result = result.output.get('result')
+            conversation_memory.add_user_message(prompt)
+            conversation_memory.add_assistant_message(readable_result)
+
+            print(f"Assistant: {readable_result}")
